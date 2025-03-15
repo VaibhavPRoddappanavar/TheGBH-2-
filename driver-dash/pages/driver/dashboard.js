@@ -190,7 +190,7 @@ export default function DriverDashboard() {
                     className="text-sm border rounded px-2 py-1 bg-white"
                   >
                     <option value="none">Sort by...</option>
-                    <option value="time">Pickup Time</option>
+                    <option value="time">Ride duration</option>
                     <option value="fare">Fare (High to Low)</option>
                     <option value="distance">Distance (Low to High)</option>
                   </select>
@@ -211,13 +211,14 @@ export default function DriverDashboard() {
                         <h4 className="font-medium">Ride #{ride._id}</h4>
                         <p className="text-sm text-gray-600">
                           From: {ride.pickup}<br />
-                          To: {ride.dropoff}
+                          To: {ride.dropoff}<br />
+                          Ride duration: {ride.pickupTime} min
                         </p>
                       </div>
                       <div className="text-right text-sm">
                         <p className="font-medium text-green-600">₹{ride.fare}</p>
                         <p className="text-gray-600">{ride.distance}km</p>
-                        <p className="text-gray-600">{ride.pickupTime}min</p>
+                        
                       </div>
                     </div>
                     {!ride.rejectedBy?.includes(driver._id) && driver.status === 'available' && (

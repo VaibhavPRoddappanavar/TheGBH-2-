@@ -94,6 +94,8 @@ function LocationMarkers({
   dropoffLocation,
   setDropoffLocation,
   calculateRoute,
+  setTravelTime,
+  travelTime
 }) {
   const map = useMapEvents({
     click: async (e) => {
@@ -105,6 +107,15 @@ function LocationMarkers({
         setDropoffLocation(clickedLocation);
         if (pickupLocation) {
           calculateRoute(pickupLocation, clickedLocation);
+          const res = await rideAPI.getTravelTime({
+            startLat: pickupLocation.lat,
+            startLng: pickupLocation.lng,
+            endLat: clickedLocation.lat,
+            endLng: clickedLocation.lng,
+          });
+
+          const {estimatedTime} = res;
+          setTravelTime(estimatedTime);
         }
       }
     },
@@ -131,7 +142,7 @@ function App() {
   const [newRide, setNewRide] = useState({
     pickup: "",
     dropoff: "",
-    distance: "",
+    distance: 0,
     fare: "",
     pickupTime: 10,
   });
@@ -139,6 +150,7 @@ function App() {
   const [dropoffLocation, setDropoffLocation] = useState<LatLng | null>(null);
   const [isSelectingPickup, setIsSelectingPickup] = useState(true);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [travelTime,setTravelTime] = useState(0);
 
   useEffect(() => {
     const socket = getSocket();
@@ -195,7 +207,19 @@ function App() {
     }
   };
 
-  const calculateRoute = async (pickup: LatLng, dropoff: LatLng) => {
+  useEffect(() => {
+    if(travelTime) {
+      const travel = parseInt(travelTime.split(" ")[0])
+      setNewRide((prev) => ({
+        ...prev,
+        pickupTime: travel,
+      }));
+
+      console.log("changing !!")
+    }
+  }, [travelTime,routeCoordinates]);
+
+  const calculateRoute = async (pickup: LatLng, dropoff: LatLng,travelTime: string) => {
     try {
       const response = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dropoff.lng},${dropoff.lat}?overview=full&geometries=geojson`
@@ -205,13 +229,14 @@ function App() {
       if (data.routes && data.routes[0]) {
         const distance = (data.routes[0].distance / 1000).toFixed(2); // Convert to km
         const estimatedFare = calculateFare(data.routes[0].distance);
-
+        
         setNewRide({
           ...newRide,
           pickup: `${pickup.lat.toFixed(6)}, ${pickup.lng.toFixed(6)}`,
           dropoff: `${dropoff.lat.toFixed(6)}, ${dropoff.lng.toFixed(6)}`,
           distance: distance,
           fare: estimatedFare.toString(),
+          pickupTime: 0,
         });
 
         // Store route coordinates
@@ -247,6 +272,7 @@ function App() {
       return;
 
     try {
+      console.log(newRide)
       const data = await rideAPI.createRide(newRide);
 
       const socket = getSocket();
@@ -262,7 +288,7 @@ function App() {
         dropoff: "",
         distance: "",
         fare: "",
-        pickupTime: 10,
+        pickupTime: 0,
       });
       setPickupLocation(null);
       setDropoffLocation(null);
@@ -276,6 +302,7 @@ function App() {
   const resetLocations = () => {
     setPickupLocation(null);
     setDropoffLocation(null);
+    setTravelTime(0);
     setIsSelectingPickup(true);
     setRouteCoordinates([]);
     setNewRide({
@@ -283,7 +310,7 @@ function App() {
       dropoff: "",
       distance: "",
       fare: "",
-      pickupTime: 10,
+      pickupTime: 0,
     });
   };
 
@@ -323,6 +350,8 @@ function App() {
                     dropoffLocation={dropoffLocation}
                     setDropoffLocation={setDropoffLocation}
                     calculateRoute={calculateRoute}
+                    setTravelTime={setTravelTime}
+                    travelTime={travelTime}
                   />
                 </MapContainer>
               </div>
@@ -367,34 +396,26 @@ function App() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Pickup Time (minutes)
+                    Ride duration
                   </label>
                   <div className="mt-1 flex items-center">
                     <span className="h-5 w-5 text-gray-500 mr-2">⏰</span>
                     <input
-                      type="number"
-                      value={newRide.pickupTime}
-                      onChange={(e) => setNewRide({ ...newRide, pickupTime: parseInt(e.target.value) || 10 })}
-                      min="5"
-                      max="60"
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                      placeholder="Enter pickup time in minutes"
-                    />
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Distance
-                  </label>
-                  <div className="mt-1 flex items-center">
-                    <Car className="h-5 w-5 text-gray-500 mr-2" />
-                    <input
                       type="text"
-                      value={newRide.distance}
+                      value={travelTime}
                       readOnly
                       className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     />
                   </div>
+                </div>
+                <div className="flex flex-col space-x-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Distance
+                  </label>
+                    <div className="mt-1 flex items-center">
+                    <Car className="h-5 w-5 text-gray-500 mr-2" />
+                    <p>{`${newRide.distance} km`}</p>
+                    </div>
                 </div>
 
                 <div>
@@ -431,7 +452,7 @@ function App() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-4">
-              <h2 className="text-xl font-semibold mb-2">Instructions</h2>
+              <h2 className="text-xl font-semibold mb-1">Instructions</h2>
               <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
                 <li>
                   Click on the map to select your pickup location (green marker)
@@ -441,7 +462,6 @@ function App() {
                 </li>
                 <li>Review the calculated route and estimated fare</li>
                 <li>Click "Request Ride" to create your ride request</li>
-                <li>Ensure your internet connection is stable for real-time updates</li>
               </ol>
             </div>
           </div>
@@ -462,7 +482,7 @@ function App() {
                     Distance: {ride.distance}km | Fare: ₹{ride.fare}
                   </p>
                   <p className="text-sm text-gray-600">
-                    Pickup Time: {ride.pickupTime} minutes
+                    Ride duration: {ride.pickupTime} minutes
                   </p>
                   <p
                     className={`text-sm mt-2 ${

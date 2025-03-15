@@ -116,17 +116,20 @@ app.post("/get-travel-time", async (req, res) => {
   const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${startLat},${startLng}&destinations=${endLat},${endLng}&mode=${mode}&departure_time=now&traffic_model=best_guess&key=${apiKey}`;
 
   try {
-      const response = await axios.get(url);
-      const data = response.data;
+    const response = await fetch(url);
+    const data = await response.json();
 
-      if (data.status === "OK" && data.rows.length > 0 && data.rows[0].elements[0].status === "OK") {
-          const duration = data.rows[0].elements[0].duration_in_traffic;
-          res.json({ estimatedTime: duration.text });
-      } else {
-          res.status(400).json({ error: "Invalid response from API" });
-      }
+    console.log(data)
+
+    if (data.status === "OK" && data.rows.length > 0 && data.rows[0].elements[0].status === "OK") {
+      const duration = data.rows[0].elements[0].duration_in_traffic;
+      res.json({ estimatedTime: duration.text });
+    } else {
+      res.status(400).json({ error: "Invalid response from API" });
+    }
   } catch (error) {
-      res.status(500).json({ error: "Error fetching travel time" });
+    console.error(error);
+    res.status(500).json({ error: "Error fetching travel time" });
   }
 });
 
@@ -142,7 +145,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000 ;
 
 // Start server
 const startServer = async () => {

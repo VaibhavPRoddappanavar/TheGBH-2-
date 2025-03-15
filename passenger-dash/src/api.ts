@@ -22,6 +22,18 @@ export const rideAPI = {
     return response.json();
   },
 
+  getTravelTime: async (data:any)=>{
+    const response = await fetch(`http://localhost:4000/get-travel-time`,{
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    
+    return response.json();
+  },
+
   acceptRide: async (rideId, driverId) => {
     const response = await fetch(`${API_BASE_URL}/rides/${rideId}/accept`, {
       method: 'PUT',

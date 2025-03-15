@@ -26,11 +26,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main.js",
       "static/chunks/pages/driver/dashboard.js"
-    ],
-    "/passenger/dashboard": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/passenger/dashboard.js"
     ]
   },
   "ampFirstPages": []
