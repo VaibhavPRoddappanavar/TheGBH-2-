@@ -10,27 +10,31 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+
+// Enable CORS for Express (Allow Any Origin)
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST"]
+}));
+
+app.use(express.json());
+
+// Enable CORS for Socket.IO (Allow Any Origin)
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"]
+    origin: "*",  // Allow requests from any origin
+    methods: ["GET", "POST"]
   }
 });
-
-// Middleware
-app.use(cors());
-app.use(express.json());
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  // Join driver room for receiving matching rides
   socket.on('joinDriverRoom', (driverId) => {
     socket.join(`driver_${driverId}`);
   });
 
-  // Join passenger room for receiving ride updates
   socket.on('joinPassengerRoom', (rideId) => {
     socket.join(`ride_${rideId}`);
   });
@@ -54,7 +58,7 @@ app.get('/health', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to database and start server
+// Start server
 const startServer = async () => {
   try {
     await connectDB();
