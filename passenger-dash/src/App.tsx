@@ -1,4 +1,4 @@
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -9,13 +9,16 @@ import {
 import { Icon, LatLng } from "leaflet";
 import { MapPin, Navigation, Car } from "lucide-react";
 import { rideAPI } from "./api";
-import { getSocket, joinPassengerRoom } from "./socket";
+import { checkForCancelArea, getSocket, joinPassengerRoom } from "./socket";
 import "leaflet/dist/leaflet.css";
 import { Polyline } from "react-leaflet";
 // Fix for default marker icons in Leaflet with Vite
 import markerIconUrl from "leaflet/dist/images/marker-icon.png";
 import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
 import { FaRegUser } from "react-icons/fa";
+import { toast } from "sonner";
+import { Toaster } from "sonner";
+import { Gift } from "lucide-react";
 
 const defaultIcon = new Icon({
   iconUrl: markerIconUrl,
@@ -23,6 +26,50 @@ const defaultIcon = new Icon({
   iconSize: [25, 41],
   iconAnchor: [12, 41],
 });
+
+const notifyHighDemandArea = () => {
+  toast.custom((t) => (
+    <div
+      className={`flex items-center gap-4 p-4 bg-blue-50 border border-blue-500 rounded-xl shadow-md w-96`}
+    >
+      <div className="p-2 bg-blue-100 rounded-full">
+        <MapPin className="text-blue-600 w-6 h-6" />
+      </div>
+      <div className="flex-1">
+        <h3 className="text-blue-900 font-semibold text-lg">
+          High Demand Area!
+        </h3>
+        <p className="text-blue-700 text-sm">
+          Booking a ride now will fetch you reward coupons!
+        </p>
+      </div>
+      <button
+        onClick={() => {
+          console.log("Booking initiated...");
+          toast.dismiss(t);
+        }}
+        className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+      >
+        Book Now
+      </button>
+    </div>
+  ));
+};
+
+export const notifyCouponEarned = () => {
+  toast("🎉 You Earned a Coupon!", {
+    description: "Use this coupon on your next ride to get amazing discounts.",
+    icon: <Gift size={22} className="text-yellow-500 mr-4" />,
+    style: {
+      border: "1px solid #facc15", // Yellow border
+      background: "#fef9c3", // Light yellow background
+      color: "#92400e", // Darker text for contrast
+      borderRadius: "12px",
+      padding: "12px",
+      boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
+    },
+  });
+};
 
 const pickupIcon = new Icon({
   ...defaultIcon.options,
@@ -96,10 +143,31 @@ function App() {
 
   useEffect(() => {
     const socket = getSocket();
+    socket.on("pickup_changed", (data) => {
+      const { near } = JSON.parse(data);
+      console.log(near);
+      if (near) {
+        notifyHighDemandArea();
+      }
+    });
+
+    socket.on("high_demand_booked", (data) => {
+      const { near } = JSON.parse(data);
+      if(near) {
+        notifyCouponEarned();
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const socket = getSocket();
     loadActiveRides();
 
+    // @ts-ignore
     socket.on("rideStatusUpdated", (updatedRide) => {
+      // @ts-ignore
       setActiveRides((prev) =>
+        // @ts-ignore
         prev.map((ride) => (ride._id === updatedRide._id ? updatedRide : ride))
       );
     });
@@ -109,11 +177,20 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (pickupLocation) {
+      console.log(pickupLocation);
+      checkForCancelArea(
+        JSON.stringify({ lat: pickupLocation.lat, lng: pickupLocation.lng })
+      );
+    }
+  }, [pickupLocation]);
+
   const loadActiveRides = async () => {
     try {
       const data = await rideAPI.getAllRides();
       setActiveRides(data);
-      data.forEach((ride) => joinPassengerRoom(ride._id));
+      data.forEach((ride: any) => joinPassengerRoom(ride._id));
     } catch (error) {
       console.error("Error loading rides:", error);
     }
@@ -125,11 +202,11 @@ function App() {
         `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dropoff.lng},${dropoff.lat}?overview=full&geometries=geojson`
       );
       const data = await response.json();
-  
+
       if (data.routes && data.routes[0]) {
         const distance = (data.routes[0].distance / 1000).toFixed(2); // Convert to km
         const estimatedFare = calculateFare(data.routes[0].distance);
-  
+
         setNewRide({
           ...newRide,
           pickup: `${pickup.lat.toFixed(6)}, ${pickup.lng.toFixed(6)}`,
@@ -137,19 +214,20 @@ function App() {
           distance: distance,
           fare: estimatedFare.toString(),
         });
-  
+
         // Store route coordinates
-        const coordinates = data.routes[0].geometry.coordinates.map(coord => ({
-          lat: coord[1],
-          lng: coord[0]
-        }));
+        const coordinates = data.routes[0].geometry.coordinates.map(
+          (coord) => ({
+            lat: coord[1],
+            lng: coord[0],
+          })
+        );
         setRouteCoordinates(coordinates);
       }
     } catch (error) {
       console.error("Error calculating route:", error);
     }
   };
-  
 
   const calculateFare = (distanceInMeters: number): number => {
     const baseRate = 2.5; // Base fare in dollars
@@ -170,7 +248,10 @@ function App() {
     try {
       const data = await rideAPI.createRide(newRide);
 
-      console.log(data);
+      const socket = getSocket();
+      socket.emit("demand_check", JSON.stringify(data));
+
+      // @ts-ignore
       setActiveRides((prev) => [data.ride, ...prev]);
       joinPassengerRoom(data.ride._id);
 
@@ -185,6 +266,7 @@ function App() {
       setPickupLocation(null);
       setDropoffLocation(null);
       setIsSelectingPickup(true);
+      setRouteCoordinates([]);
     } catch (error) {
       console.error("Error creating ride:", error);
     }
@@ -206,9 +288,11 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="flex py-2 space-x-2 bg-white items-center justify-center">
-      <FaRegUser size={25} />
-      <h1 className="text-3xl font-bold text-center py-3 px-4 rounded-3xl  w-fit">Passenger Dashboard</h1>
+      <div className="flex py-2 shadow-sm space-x-2 bg-white items-center justify-center">
+        <FaRegUser size={25} />
+        <h1 className="text-3xl font-bold text-center py-3 px-4 rounded-3xl  w-fit">
+          Passenger Dashboard
+        </h1>
       </div>
       <div className="container mx-auto p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -221,7 +305,11 @@ function App() {
                   zoom={13}
                   className="w-full h-full"
                 >
-                  <Polyline positions={routeCoordinates} color="blue" weight={5} />
+                  <Polyline
+                    positions={routeCoordinates}
+                    color="blue"
+                    weight={5}
+                  />
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -325,7 +413,7 @@ function App() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-4">
-              <h2 className="text-xl font-semibold mb-4">Instructions</h2>
+              <h2 className="text-xl font-semibold mb-2">Instructions</h2>
               <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
                 <li>
                   Click on the map to select your pickup location (green marker)
@@ -335,6 +423,7 @@ function App() {
                 </li>
                 <li>Review the calculated route and estimated fare</li>
                 <li>Click "Request Ride" to create your ride request</li>
+                <li>Ensure your internet connection is stable for real-time updates</li>
               </ol>
             </div>
           </div>
@@ -385,6 +474,7 @@ function App() {
           </div>
         </div>
       </div>
+      <Toaster />
     </div>
   );
 }

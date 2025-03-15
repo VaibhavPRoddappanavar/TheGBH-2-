@@ -1,6 +1,6 @@
-import io from 'socket.io-client';
+import io, { Socket } from 'socket.io-client';
 
-let socket;
+let socket: Socket;
 
 export const initializeSocket = () => {
   socket = io('http://localhost:4000');
@@ -23,14 +23,20 @@ export const getSocket = () => {
   return socket;
 };
 
-export const joinDriverRoom = (driverId) => {
+export const joinDriverRoom = (driverId: string) => {
   if (socket) {
     socket.emit('joinDriverRoom', driverId);
   }
 };
 
-export const joinPassengerRoom = (rideId) => {
+export const joinPassengerRoom = (rideId: string) => {
   if (socket) {
     socket.emit('joinPassengerRoom', rideId);
   }
 };
+
+export const checkForCancelArea = (data: string) => {
+  if(socket){
+    socket.emit('pickup_changed', data);
+  }
+}
