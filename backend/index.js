@@ -7,6 +7,7 @@ const connectDB = require("./config/db");
 const fs = require("fs");
 const path = require("path");
 const csv = require("csv-parser");
+require("dotenv").config();
 
 // Load env vars
 dotenv.config();
@@ -55,7 +56,7 @@ function isHighCancellationNearby(userLat, userLong, thresholdDistance = 1) {
 app.use(
   cors({
     origin: "*",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
 
@@ -65,7 +66,7 @@ app.use(express.json());
 const io = new Server(httpServer, {
   cors: {
     origin: "*", // Allow requests from any origin
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
   },
 });
 
@@ -105,6 +106,28 @@ io.on("connection", (socket) => {
     socket.emit('high_demand_booked', JSON.stringify({ near: near }));
   })
 
+});
+
+
+app.post("/get-travel-time", async (req, res) => {
+  const { startLat, startLng, endLat, endLng, mode = "driving" } = req.body;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  
+  const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${startLat},${startLng}&destinations=${endLat},${endLng}&mode=${mode}&departure_time=now&traffic_model=best_guess&key=${apiKey}`;
+
+  try {
+      const response = await axios.get(url);
+      const data = response.data;
+
+      if (data.status === "OK" && data.rows.length > 0 && data.rows[0].elements[0].status === "OK") {
+          const duration = data.rows[0].elements[0].duration_in_traffic;
+          res.json({ estimatedTime: duration.text });
+      } else {
+          res.status(400).json({ error: "Invalid response from API" });
+      }
+  } catch (error) {
+      res.status(500).json({ error: "Error fetching travel time" });
+  }
 });
 
 // Make io accessible to route handlers

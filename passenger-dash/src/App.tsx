@@ -1,24 +1,23 @@
-import { useState, useEffect } from "react";
+import { Icon, LatLng } from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { Car, MapPin, Navigation } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   MapContainer,
-  TileLayer,
   Marker,
+  Polyline,
   Popup,
+  TileLayer,
   useMapEvents,
 } from "react-leaflet";
-import { Icon, LatLng } from "leaflet";
-import { MapPin, Navigation, Car } from "lucide-react";
 import { rideAPI } from "./api";
 import { checkForCancelArea, getSocket, joinPassengerRoom } from "./socket";
-import "leaflet/dist/leaflet.css";
-import { Polyline } from "react-leaflet";
 // Fix for default marker icons in Leaflet with Vite
 import markerIconUrl from "leaflet/dist/images/marker-icon.png";
 import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
-import { FaRegUser } from "react-icons/fa";
-import { toast } from "sonner";
-import { Toaster } from "sonner";
 import { Gift } from "lucide-react";
+import { FaRegUser } from "react-icons/fa";
+import { toast, Toaster } from "sonner";
 
 const defaultIcon = new Icon({
   iconUrl: markerIconUrl,
@@ -134,7 +133,7 @@ function App() {
     dropoff: "",
     distance: "",
     fare: "",
-    trafficLevel: "low",
+    pickupTime: 10,
   });
   const [pickupLocation, setPickupLocation] = useState<LatLng | null>(null);
   const [dropoffLocation, setDropoffLocation] = useState<LatLng | null>(null);
@@ -230,10 +229,12 @@ function App() {
   };
 
   const calculateFare = (distanceInMeters: number): number => {
-    const baseRate = 2.5; // Base fare in dollars
-    const perKmRate = 1.5; // Rate per kilometer
     const distanceInKm = distanceInMeters / 1000;
-    return Math.round((baseRate + distanceInKm * perKmRate) * 100) / 100;
+    // Bangalore pricing logic
+    if (distanceInKm <= 2) {
+      return 30; // Min fare for up to 2 km
+    }
+    return Math.round(30 + (distanceInKm - 2) * 15); // ₹15 per km after 2 km
   };
 
   const createRideRequest = async () => {
@@ -261,7 +262,7 @@ function App() {
         dropoff: "",
         distance: "",
         fare: "",
-        trafficLevel: "low",
+        pickupTime: 10,
       });
       setPickupLocation(null);
       setDropoffLocation(null);
@@ -282,7 +283,7 @@ function App() {
       dropoff: "",
       distance: "",
       fare: "",
-      trafficLevel: "low",
+      pickupTime: 10,
     });
   };
 
@@ -366,6 +367,23 @@ function App() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
+                    Pickup Time (minutes)
+                  </label>
+                  <div className="mt-1 flex items-center">
+                    <span className="h-5 w-5 text-gray-500 mr-2">⏰</span>
+                    <input
+                      type="number"
+                      value={newRide.pickupTime}
+                      onChange={(e) => setNewRide({ ...newRide, pickupTime: parseInt(e.target.value) || 10 })}
+                      min="5"
+                      max="60"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Enter pickup time in minutes"
+                    />
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Distance
                   </label>
                   <div className="mt-1 flex items-center">
@@ -384,7 +402,7 @@ function App() {
                     Estimated Fare
                   </label>
                   <div className="mt-1 flex items-center">
-                    <span className="h-5 w-5 text-gray-500 mr-2">$</span>
+                    <span className="h-5 w-5 text-gray-500 mr-2">₹</span>
                     <input
                       type="text"
                       value={newRide.fare}
@@ -444,9 +462,7 @@ function App() {
                     Distance: {ride.distance}km | Fare: ₹{ride.fare}
                   </p>
                   <p className="text-sm text-gray-600">
-                    Traffic Level:{" "}
-                    {ride.trafficLevel.charAt(0).toUpperCase() +
-                      ride.trafficLevel.slice(1)}
+                    Pickup Time: {ride.pickupTime} minutes
                   </p>
                   <p
                     className={`text-sm mt-2 ${

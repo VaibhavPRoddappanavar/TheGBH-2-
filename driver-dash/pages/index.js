@@ -25,7 +25,7 @@ export default function Home() {
             <h2 className="text-2xl font-bold mb-4">Passenger Section</h2>
             <p className="mb-6">Create new ride requests</p>
             <button
-              onClick={() => router.push('/passenger/dashboard')}
+              onClick={() => window.location.href = 'http://localhost:5173/'}
               className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors"
             >
               Passenger Dashboard

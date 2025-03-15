@@ -17,10 +17,10 @@ const rideSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  trafficLevel: {
-    type: String,
-    enum: ['low', 'medium', 'high'],
-    default: 'low'
+  pickupTime: {
+    type: Number,
+    required: true,
+    default: 10
   },
   status: {
     type: String,

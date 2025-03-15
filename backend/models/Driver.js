@@ -14,9 +14,9 @@ const driverSchema = new mongoose.Schema({
       type: Number,
       default: 100
     },
-    avoidTraffic: {
-      type: Boolean,
-      default: false
+    maxPickupTime: {
+      type: Number,
+      default: 15
     }
   },
   status: {

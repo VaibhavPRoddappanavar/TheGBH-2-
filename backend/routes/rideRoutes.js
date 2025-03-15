@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
     dropoff: req.body.dropoff,
     distance: req.body.distance,
     fare: req.body.fare,
-    trafficLevel: req.body.trafficLevel
+    pickupTime: req.body.pickupTime
   });
 
   try {
@@ -44,13 +44,7 @@ router.post('/', async (req, res) => {
       status: 'available',
       'preferences.maxTripDistance': { $gte: req.body.distance },
       'preferences.minimumFare': { $lte: req.body.fare },
-      $or: [
-        { 'preferences.avoidTraffic': false },
-        { 
-          'preferences.avoidTraffic': true,
-          trafficLevel: { $ne: 'high' }
-        }
-      ]
+      'preferences.maxPickupTime': { $gte: req.body.pickupTime }
     });
 
     // Emit event for matching drivers (will be implemented with Socket.IO)
